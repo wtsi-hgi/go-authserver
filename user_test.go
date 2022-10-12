@@ -32,7 +32,7 @@ import (
 )
 
 func TestUser(t *testing.T) {
-	username, uid := getUser(t)
+	username, uid := GetUser(t)
 
 	Convey("Given a User", t, func() {
 		u := &User{Username: username, UID: uid}

@@ -26,15 +26,9 @@
 package server
 
 import (
-	"context"
 	"embed"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
-	"os/exec"
-	"os/user"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -44,15 +38,13 @@ import (
 	"github.com/go-resty/resty/v2"
 	gjwt "github.com/golang-jwt/jwt/v4"
 	. "github.com/smartystreets/goconvey/convey"
-	"github.com/wtsi-ssg/wr/network/port"
-	"golang.org/x/sync/errgroup"
 )
 
 //go:embed static
 var staticFS embed.FS
 
 func TestServer(t *testing.T) {
-	username, uid := getUser(t)
+	username, uid := GetUser(t)
 	exampleUser := &User{Username: username, UID: uid}
 
 	Convey("hasError tells you about errors", t, func() {
@@ -76,10 +68,11 @@ func TestServer(t *testing.T) {
 		})
 
 		Convey("You can Start the Server", func() {
-			certPath, keyPath, err := createTestCert(t)
+			certPath, keyPath, err := CreateTestCert(t)
 			So(err, ShouldBeNil)
 
-			addr, dfunc := startTestServer(s, certPath, keyPath)
+			addr, dfunc, err := StartTestServer(s, certPath, keyPath)
+			So(err, ShouldBeNil)
 			defer dfunc()
 
 			client := resty.New()
@@ -167,7 +160,7 @@ func TestServer(t *testing.T) {
 				So(resp.String(), ShouldEqual, `{"code":403,"message":"you don't have permission to access this resource"}`)
 
 				var keyPath2 string
-				_, keyPath2, err = createTestCert(t)
+				_, keyPath2, err = CreateTestCert(t)
 				So(err, ShouldBeNil)
 
 				var manualWronglySignedToken string
@@ -296,10 +289,11 @@ func TestServer(t *testing.T) {
 			os.Setenv(DevEnvKey, "0")
 			s.AddStaticPage(staticFS, "static", "/s1")
 
-			certPath, keyPath, err := createTestCert(t)
+			certPath, keyPath, err := CreateTestCert(t)
 			So(err, ShouldBeNil)
 
-			addr, dfunc := startTestServer(s, certPath, keyPath)
+			addr, dfunc, err := StartTestServer(s, certPath, keyPath)
+			So(err, ShouldBeNil)
 			defer dfunc()
 
 			r := NewClientRequest(addr, certPath)
@@ -333,7 +327,7 @@ func TestServer(t *testing.T) {
 				panic("bar")
 			})
 
-			response, err := queryREST(s, "/foo", "")
+			response, err := QueryREST(s.router, "/foo", "")
 			So(err, ShouldBeNil)
 			So(response.Code, ShouldEqual, http.StatusInternalServerError)
 			So(logWriter.String(), ShouldContainSubstring, "STATUS=500")
@@ -442,25 +436,6 @@ func hasBlankValue(vals ...string) bool {
 	return false
 }
 
-// createTestCert creates a self-signed cert and key, returning their paths.
-func createTestCert(t *testing.T) (string, string, error) {
-	t.Helper()
-
-	dir := t.TempDir()
-	certPath := filepath.Join(dir, "cert")
-	keyPath := filepath.Join(dir, "key")
-
-	cmd := exec.Command("openssl", "req", "-new", "-newkey", "rsa:4096",
-		"-days", "1", "-nodes", "-x509", "-subj", "/CN=localhost",
-		"-addext", "subjectAltName = DNS:localhost",
-		"-keyout", keyPath, "-out", certPath,
-	)
-
-	err := cmd.Run()
-
-	return certPath, keyPath, err
-}
-
 // makeTestToken creates a JWT signed with the key at the given path, that
 // has orig_iat of start and exp of end, and includes a claimKeyUsername claim
 // if withUserClaims is true.
@@ -491,73 +466,6 @@ func makeTestToken(keyPath string, start, end time.Time, withUserClaims bool) (s
 	}
 
 	return token.SignedString(key)
-}
-
-// getUser returns the current users username and uid.
-func getUser(t *testing.T) (string, string) {
-	t.Helper()
-
-	uu, err := user.Current()
-	if err != nil {
-		t.Logf("getting current user failed: %s", err.Error())
-
-		return "", ""
-	}
-
-	return uu.Username, uu.Uid
-}
-
-// queryREST does a test GET of the given REST endpoint (start it with /), with
-// extra appended (start it with ?).
-func queryREST(s *Server, endpoint, extra string) (*httptest.ResponseRecorder, error) {
-	response := httptest.NewRecorder()
-
-	req, err := http.NewRequestWithContext(context.Background(), "GET", endpoint+extra, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	s.router.ServeHTTP(response, req)
-
-	return response, nil
-}
-
-// startTestServer starts the given server using the given cert and key paths
-// and returns the address and a func you should defer to stop the server.
-func startTestServer(s *Server, certPath, keyPath string) (string, func()) {
-	addr := getTestServerAddress()
-	dfunc := startTestServerUsingAddress(addr, s, certPath, keyPath)
-
-	return addr, dfunc
-}
-
-// getTestServerAddress determines a free port and returns localhost:port.
-func getTestServerAddress() string {
-	checker, err := port.NewChecker("localhost")
-	So(err, ShouldBeNil)
-	port, _, err := checker.AvailableRange(2)
-	So(err, ShouldBeNil)
-
-	return fmt.Sprintf("localhost:%d", port)
-}
-
-// startTestServerUsingAddress does what startTestServer does, but using the
-// given address.
-func startTestServerUsingAddress(addr string, s *Server, certPath, keyPath string) func() {
-	var g errgroup.Group
-
-	g.Go(func() error {
-		return s.Start(addr, certPath, keyPath)
-	})
-
-	<-time.After(100 * time.Millisecond)
-
-	return func() {
-		s.Stop()
-
-		err := g.Wait()
-		So(err, ShouldBeNil)
-	}
 }
 
 // authnLogin is used to login with username and password via the authn endpoint
