@@ -57,7 +57,7 @@ server.AddOIDCRoutes(oktaURL, oktaOAuthIssuer, oktaOAuthClientID, oktaOAuthClien
 ```
 
 Then a command-line client can log in using Okta after getting a code by
-visiting "https://localhost:8080/login-cli" :
+visiting https://localhost:8080/login-cli :
 
 ```
 jwt, err := gas.LoginWithOKTA("localhost:8080", "cert.pem", code)
