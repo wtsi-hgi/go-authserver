@@ -281,45 +281,51 @@ func TestServer(t *testing.T) {
 				So(user2, ShouldBeNil)
 			})
 
-			Convey("You can add static web pages to the server, with and without GAS_DEV set", func() {
-				orig := os.Getenv(DevEnvKey)
-				defer func() {
-					os.Setenv(DevEnvKey, orig)
-				}()
-
-				os.Setenv(DevEnvKey, "0")
-				s.AddStaticPage(staticFS, "static", "/s1")
-
-				r := NewClientRequest(addr, certPath)
-				resp, err = r.Get("https://" + addr + "/s1/index.html")
-				So(err, ShouldBeNil)
-
-				So(resp.StatusCode(), ShouldEqual, http.StatusOK)
-				html := "<!DOCTYPE html>"
-				So(resp.String(), ShouldStartWith, html)
-
-				s.AddStaticPage(staticFS, "static/subdir", "/s2/sub")
-
-				resp, err = r.Get("https://" + addr + "/s2/sub/subdir.html")
-				So(err, ShouldBeNil)
-
-				So(resp.StatusCode(), ShouldEqual, http.StatusOK)
-				So(resp.String(), ShouldStartWith, html)
-
-				os.Setenv(DevEnvKey, "1")
-				s.AddStaticPage(staticFS, "static", "/s3")
-
-				resp, err = r.Get("https://" + addr + "/s3/index.html")
-				So(err, ShouldBeNil)
-
-				So(resp.StatusCode(), ShouldEqual, http.StatusOK)
-				So(resp.String(), ShouldStartWith, html)
-			})
-
 			Convey("Stop() cleans up and calls the callback", func() {
 				s.Stop()
 				So(stopCalled, ShouldBeTrue)
 			})
+		})
+
+		Convey("You can add static web pages to the server, with and without GAS_DEV set", func() {
+			orig := os.Getenv(DevEnvKey)
+			defer func() {
+				os.Setenv(DevEnvKey, orig)
+			}()
+
+			os.Setenv(DevEnvKey, "0")
+			s.AddStaticPage(staticFS, "static", "/s1")
+
+			certPath, keyPath, err := createTestCert(t)
+			So(err, ShouldBeNil)
+
+			addr, dfunc := startTestServer(s, certPath, keyPath)
+			defer dfunc()
+
+			r := NewClientRequest(addr, certPath)
+			resp, err := r.Get("https://" + addr + "/s1/index.html")
+			So(err, ShouldBeNil)
+
+			So(resp.StatusCode(), ShouldEqual, http.StatusOK)
+			html := "<!DOCTYPE html>"
+			So(resp.String(), ShouldStartWith, html)
+
+			s.AddStaticPage(staticFS, "static/subdir", "/s2/sub")
+
+			resp, err = r.Get("https://" + addr + "/s2/sub/subdir.html")
+			So(err, ShouldBeNil)
+
+			So(resp.StatusCode(), ShouldEqual, http.StatusOK)
+			So(resp.String(), ShouldStartWith, html)
+
+			os.Setenv(DevEnvKey, "1")
+			s.AddStaticPage(staticFS, "static", "/s3")
+
+			resp, err = r.Get("https://" + addr + "/s3/index.html")
+			So(err, ShouldBeNil)
+
+			So(resp.StatusCode(), ShouldEqual, http.StatusOK)
+			So(resp.String(), ShouldStartWith, html)
 		})
 
 		Convey("Endpoints that panic are logged", func() {
