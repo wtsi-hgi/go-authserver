@@ -57,12 +57,12 @@ func TestUser(t *testing.T) {
 		})
 	})
 
-	Convey("userNameToUID works, returning an error with invalid users", t, func() {
-		uid, err := userNameToUID(username)
+	Convey("UserNameToUID works, returning an error with invalid users", t, func() {
+		uid, err := UserNameToUID(username)
 		So(err, ShouldBeNil)
 		So(uid, ShouldEqual, uid)
 
-		_, err = userNameToUID("!@£@$")
+		_, err = UserNameToUID("!@£@$")
 		So(err, ShouldNotBeNil)
 	})
 }

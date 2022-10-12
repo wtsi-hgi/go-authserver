@@ -220,10 +220,10 @@ func tokenResponder(c *gin.Context, code int, token string, t time.Time) {
 	c.JSON(http.StatusOK, token)
 }
 
-// getUser retrieves the *User information extracted from the JWT in the auth
+// GetUser retrieves the *User information extracted from the JWT in the auth
 // header. This will only be present after calling EnableAuth(), on a route in
 // the authGroup.
-func (s *Server) getUser(c *gin.Context) *User {
+func (s *Server) GetUser(c *gin.Context) *User {
 	userI, ok := c.Get(userKey)
 	if !ok {
 		return nil

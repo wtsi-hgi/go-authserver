@@ -54,8 +54,8 @@ func getGIDsForUID(uid string) ([]string, error) {
 	return u.GroupIds()
 }
 
-// userNameToUID converts user name to UID.
-func userNameToUID(name string) (string, error) {
+// UserNameToUID converts user name to UID.
+func UserNameToUID(name string) (string, error) {
 	u, err := user.Lookup(name)
 	if err != nil {
 		return "", err

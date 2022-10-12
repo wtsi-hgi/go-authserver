@@ -94,7 +94,7 @@ type Server struct {
 	stopCB    StopCallback
 	webOAuth  *oauthEnv
 	cliOAuth  *oauthEnv
-	logger    *log.Logger
+	Logger    *log.Logger
 }
 
 // New creates a Server which can serve a REST API and website.
@@ -117,7 +117,7 @@ func New(logWriter io.Writer) *Server {
 
 	return &Server{
 		router: r,
-		logger: logger,
+		Logger: logger,
 	}
 }
 

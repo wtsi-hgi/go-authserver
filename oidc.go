@@ -90,7 +90,7 @@ func (s *Server) oidcAuth(c *gin.Context) (*User, error) {
 
 	username := getUsernameFromEmail(email)
 
-	uid, err := userNameToUID(username)
+	uid, err := UserNameToUID(username)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +221,7 @@ func (s *Server) AddOIDCRoutes(addr, issuer, clientID, clientSecret string) {
 		issuer:       issuer,
 		clientID:     clientID,
 		clientSecret: clientSecret,
-		logger:       s.logger,
+		logger:       s.Logger,
 	}
 
 	s.webOAuth = params.toOauthEnv(ClientProtocol+addr+EndpointAuthCallback, "/")

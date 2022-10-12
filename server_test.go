@@ -141,7 +141,7 @@ func TestServer(t *testing.T) {
 				s.authGroup.GET("/test", func(c *gin.Context) {
 					called++
 					userI, _ = c.Get(userKey)
-					gu = s.getUser(c)
+					gu = s.GetUser(c)
 					claims = jwt.ExtractClaims(c)
 				})
 
@@ -265,9 +265,9 @@ func TestServer(t *testing.T) {
 				var user1, user2 *User
 
 				s.router.GET("/test", func(c *gin.Context) {
-					user1 = s.getUser(c)
+					user1 = s.GetUser(c)
 					c.Keys = map[string]interface{}{userKey: "foo"}
-					user2 = s.getUser(c)
+					user2 = s.GetUser(c)
 
 					called++
 				})
