@@ -274,6 +274,20 @@ func TestServer(t *testing.T) {
 				So(user2, ShouldBeNil)
 			})
 
+			Convey("After IncludeAbortErrorsInBody, AbortWithError() calls get their errors in the body", func() {
+				router.Use(IncludeAbortErrorsInBody)
+
+				router.GET("/test", func(c *gin.Context) {
+					c.AbortWithError(http.StatusUnauthorized, ErrNeedsAuth) //nolint:errcheck
+				})
+
+				r := NewClientRequest(addr, certPath)
+				resp, err = r.Get("https://" + addr + "/test")
+				So(err, ShouldBeNil)
+				So(resp.StatusCode(), ShouldEqual, http.StatusUnauthorized)
+				So(string(resp.Body()), ShouldEqual, ErrNeedsAuth)
+			})
+
 			Convey("Stop() cleans up and calls the callback", func() {
 				s.Stop()
 				So(stopCalled, ShouldBeTrue)

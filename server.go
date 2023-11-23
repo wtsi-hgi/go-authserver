@@ -152,6 +152,19 @@ func (s *Server) AuthRouter() *gin.RouterGroup {
 	return s.authGroup
 }
 
+// IncludeAbortErrorsInBody is a gin.HandlerFunc that can be Use()d with gin
+// routers from Router() and AuthRouter() that ensures that the errors we
+// accumulate in AbortWithError() calls get written to the returned body.
+func IncludeAbortErrorsInBody(c *gin.Context) {
+	c.Next()
+
+	if c.Errors != nil && c.IsAborted() {
+		for _, err := range c.Errors {
+			c.Writer.Write([]byte(err.Error())) //nolint:errcheck
+		}
+	}
+}
+
 // Start will start listening to the given address (eg. "localhost:8080"), and
 // serve the REST API and website over https; you must provide paths to your
 // certficate and key file.
