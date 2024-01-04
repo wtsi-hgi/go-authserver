@@ -161,10 +161,12 @@ func (c *ClientCLI) Login(usernameAndPassword ...string) error {
 		return err
 	}
 
+	r := NewClientRequest(c.url, c.cert)
+
 	if c.oktaMode {
-		c.jwt, err = LoginWithOKTA(c.url, c.cert, user, string(passwordB))
+		c.jwt, err = LoginWithOKTA(r, user, string(passwordB))
 	} else {
-		c.jwt, err = Login(c.url, c.cert, user, string(passwordB))
+		c.jwt, err = Login(r, user, string(passwordB))
 	}
 
 	return err

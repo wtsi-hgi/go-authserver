@@ -26,6 +26,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"embed"
 	"net/http"
 	"os"
@@ -113,16 +114,17 @@ func TestServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(resp.String(), ShouldEqual, `{"code":401,"message":"missing Username or Password"}`)
 
-				_, err = Login("foo", certPath, username, "foo")
+				rbad := NewClientRequest("foo", certPath)
+				_, err = Login(rbad, username, "foo")
 				So(err, ShouldNotBeNil)
 
 				var token string
-				token, err = Login(addr, certPath, username, "foo")
+				token, err = Login(r, username, "foo")
 				So(err, ShouldNotBeNil)
 				So(err, ShouldEqual, ErrNoAuth)
 				So(token, ShouldBeBlank)
 
-				token, err = Login(addr, certPath, username, "pass")
+				token, err = Login(r, username, "pass")
 				So(err, ShouldBeNil)
 				So(token, ShouldNotBeBlank)
 
@@ -375,7 +377,8 @@ func TestServerOktaLogin(t *testing.T) {
 		logWriter := NewStringLogger()
 		s := New(logWriter)
 
-		jwt, err := LoginWithOKTA(addr, certPath, "user", "foo")
+		r := newTestingClientRequest(addr, certPath)
+		jwt, err := LoginWithOKTA(r, "user", "foo")
 		So(err, ShouldNotBeNil)
 		So(jwt, ShouldBeBlank)
 
@@ -388,14 +391,14 @@ func TestServerOktaLogin(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("You can't LoginWithOkta without first getting a code", func() {
-			_, err = LoginWithOKTA(addr, certPath, "user", "foo")
+			_, err = LoginWithOKTA(r, "user", "foo")
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("After AddOIDCRoutes you can access the login-cli endpoint and LoginWithOKTA to get a JWT", func() {
 			s.AddOIDCRoutes(addr, issuer, clientID, secret)
-			r := NewClientRequest(addr, certPath)
 
+			r = newTestingClientRequest(addr, "")
 			resp, errp := r.Get(EndpointOIDCCLILogin)
 			So(errp, ShouldBeNil)
 			content := resp.String()
@@ -414,15 +417,16 @@ func TestServerOktaLogin(t *testing.T) {
 			code := resp.String()
 			So(code, ShouldNotBeBlank)
 
-			jwt, errp := LoginWithOKTA(addr, "", "user", code)
+			r = newTestingClientRequest(addr, "")
+			jwt, errp := LoginWithOKTA(r, "user", code)
 			So(errp, ShouldBeNil)
 			So(jwt, ShouldNotBeBlank)
 		})
 
 		Convey("After AddOIDCRoutes you can access the login endpoint", func() {
 			s.AddOIDCRoutes(addr, issuer, clientID, secret)
-			r := NewClientRequest(addr, certPath)
 
+			r = newTestingClientRequest(addr, "")
 			resp, errp := r.Get(EndpointOIDCLogin)
 			So(errp, ShouldBeNil)
 			content := resp.String()
@@ -509,6 +513,8 @@ func authnLogin(s *Server, r *resty.Request, oktaDomain, username, password, add
 	moa := &ManualOktaAuthn{}
 
 	rOkta := resty.New()
+	rOkta.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
+
 	resp, err := rOkta.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(map[string]interface{}{"username": username, "password": password}).
