@@ -288,6 +288,23 @@ func (s *Server) tokenStoragePath(tokenBasename string) (string, error) {
 	return filepath.Join(tokenDir, tokenBasename), nil
 }
 
+// AllowedAccess gets our current user if we have EnableAuth(), and returns
+// true if that matches the given username. Always returns true if we have not
+// EnableAuth(), or if our current user is the user who started the Server.
+// If user is blank, it's a test if the current user started the Server.
+func (s *Server) AllowedAccess(c *gin.Context, user string) bool {
+	u := s.GetUser(c)
+	if u == nil {
+		return true
+	}
+
+	if u.Username == s.serverUser {
+		return true
+	}
+
+	return u.Username == user
+}
+
 // GetUser retrieves the *User information extracted from the JWT in the auth
 // header. This will only be present after calling EnableAuth(), on a route in
 // the authGroup.
