@@ -375,7 +375,7 @@ func TestServerOktaLogin(t *testing.T) {
 		logWriter := NewStringLogger()
 		s := New(logWriter)
 
-		jwt, err := LoginWithOKTA(addr, certPath, "foo")
+		jwt, err := LoginWithOKTA(addr, certPath, "user", "foo")
 		So(err, ShouldNotBeNil)
 		So(jwt, ShouldBeBlank)
 
@@ -388,13 +388,13 @@ func TestServerOktaLogin(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		Convey("You can't LoginWithOkta without first getting a code", func() {
-			_, err = LoginWithOKTA(addr, certPath, "foo")
+			_, err = LoginWithOKTA(addr, certPath, "user", "foo")
 			So(err, ShouldNotBeNil)
 		})
 
 		Convey("After AddOIDCRoutes you can access the login-cli endpoint and LoginWithOKTA to get a JWT", func() {
 			s.AddOIDCRoutes(addr, issuer, clientID, secret)
-			r := NewClientRequest(addr, "")
+			r := NewClientRequest(addr, certPath)
 
 			resp, errp := r.Get(EndpointOIDCCLILogin)
 			So(errp, ShouldBeNil)
@@ -414,14 +414,14 @@ func TestServerOktaLogin(t *testing.T) {
 			code := resp.String()
 			So(code, ShouldNotBeBlank)
 
-			jwt, errp := LoginWithOKTA(addr, "", code)
+			jwt, errp := LoginWithOKTA(addr, "", "user", code)
 			So(errp, ShouldBeNil)
 			So(jwt, ShouldNotBeBlank)
 		})
 
 		Convey("After AddOIDCRoutes you can access the login endpoint", func() {
 			s.AddOIDCRoutes(addr, issuer, clientID, secret)
-			r := NewClientRequest(addr, "")
+			r := NewClientRequest(addr, certPath)
 
 			resp, errp := r.Get(EndpointOIDCLogin)
 			So(errp, ShouldBeNil)

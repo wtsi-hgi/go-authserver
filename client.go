@@ -104,13 +104,17 @@ func jsonStringBodyToString(body []byte) string {
 // LoginWithOKTA sends a request to the server containing the token as a cookie,
 // so it will be able to return the JWT for the user. Provide an addr that is
 // just the domain:port that was used to Start() the server.
-func LoginWithOKTA(addr, cert, token string) (string, error) {
+func LoginWithOKTA(addr, cert, username, token string) (string, error) {
 	r := NewClientRequest(addr, cert)
 
 	resp, err := r.SetCookie(&http.Cookie{
 		Name:  oktaCookieName,
 		Value: token,
-	}).Post(EndPointJWT)
+	}).SetFormData(map[string]string{
+		"username": username,
+		"password": token,
+	}).
+		Post(EndPointJWT)
 
 	if err != nil {
 		return "", err
