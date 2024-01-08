@@ -82,16 +82,13 @@ issues:
 linters:
   disable-all: true
   enable:
-    - deadcode
     - errcheck
     - gosimple
     - govet
     - ineffassign
     - staticcheck
-    - structcheck
     - typecheck
     - unused
-    - varcheck
     - containedctx
     - contextcheck
     - cyclop
@@ -146,6 +143,7 @@ linters:
   #   - asciicheck
   #   - bidichk
   #   - bodyclose
+  #   - deadcode
   #   - decorder
   #   - depguard
   #   - errchkjson
@@ -164,8 +162,10 @@ linters:
   #   - promlinter
   #   - revive
   #   - sqlclosecheck
+  #  - structcheck
   #   - tagliatelle
   #   - testpackage
   #   - tparallel
+  #   - varcheck
   #   - varnamelen
   #   - wrapcheck
