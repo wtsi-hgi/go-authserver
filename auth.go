@@ -269,6 +269,8 @@ func (s *Server) EnableAuthWithServerToken(certFile, keyFile, tokenBasename stri
 		return err
 	}
 
+	s.serverTokenPath = tokenPath
+
 	s.serverToken, err = GenerateAndStoreTokenForSelfClient(tokenPath)
 	if err != nil {
 		return err
