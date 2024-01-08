@@ -28,8 +28,10 @@ package server
 import (
 	"crypto/tls"
 	"embed"
+	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -43,6 +45,31 @@ import (
 
 //go:embed static
 var staticFS embed.FS
+
+type mockPasswordHandler struct {
+	out        string
+	readCalled bool
+	password   string
+	enabled    bool
+}
+
+// Prompt appends the given string to our out, formatting it with any given
+// vars.
+func (p *mockPasswordHandler) Prompt(msg string, a ...interface{}) {
+	p.out += fmt.Sprintf(msg, a...)
+}
+
+// ReadPassword records the method was called and returns password.
+func (p *mockPasswordHandler) ReadPassword() ([]byte, error) {
+	p.readCalled = true
+
+	return []byte(p.password), nil
+}
+
+// IsTerminal returns the value of enabled.
+func (p *mockPasswordHandler) IsTerminal() bool {
+	return p.enabled
+}
 
 func TestServer(t *testing.T) {
 	username, uid := GetUser(t)
@@ -227,6 +254,109 @@ func TestServer(t *testing.T) {
 				So(ok, ShouldBeTrue)
 				So(user, ShouldResemble, exampleUser)
 				So(gu, ShouldResemble, exampleUser)
+			})
+
+			Convey("ClientCLI stores tokens and allows for self-login", func() {
+				jwtb := ".gas.test.jwt"
+				stb := ".gas.test.servertoken"
+
+				c, errc := NewClientCLI(jwtb, stb, addr, certPath, false)
+				So(errc, ShouldBeNil)
+				So(c, ShouldNotBeNil)
+				mph := &mockPasswordHandler{}
+				c.passwordHandler = mph
+
+				tDir, errc := TokenDir()
+				So(errc, ShouldBeNil)
+
+				jwtPath, errc := c.jwtStoragePath()
+				So(errc, ShouldBeNil)
+				So(jwtPath, ShouldEqual, filepath.Join(tDir, jwtb))
+
+				stPath, errc := c.tokenStoragePath()
+				So(errc, ShouldBeNil)
+				So(stPath, ShouldEqual, filepath.Join(tDir, stb))
+
+				_, err = os.Stat(jwtPath)
+				So(err, ShouldNotBeNil)
+				_, err = os.Stat(stPath)
+				So(err, ShouldNotBeNil)
+
+				defer func() {
+					os.Remove(jwtPath)
+					os.Remove(stPath)
+				}()
+
+				So(c.CanReadServerToken(), ShouldBeFalse)
+
+				err = s.EnableAuthWithServerToken(certPath, keyPath, stb, func(u, p string) (bool, string) {
+					ok := p == "pass"
+
+					return ok, uid
+				})
+				So(err, ShouldBeNil)
+
+				err = c.Login()
+				So(err, ShouldBeNil)
+				So(mph.out, ShouldBeBlank)
+				So(mph.readCalled, ShouldBeFalse)
+
+				_, err = os.Stat(jwtPath)
+				So(err, ShouldBeNil)
+				_, err = os.Stat(stPath)
+				So(err, ShouldBeNil)
+
+				So(c.CanReadServerToken(), ShouldBeTrue)
+
+				err = os.Remove(jwtPath)
+				So(err, ShouldBeNil)
+				c.jwt = ""
+
+				jwt, errc := c.GetJWT()
+				So(errc, ShouldBeNil)
+				So(jwt, ShouldNotBeBlank)
+
+				_, err = os.Stat(jwtPath)
+				So(err, ShouldBeNil)
+
+				err = os.Remove(jwtPath)
+				So(err, ShouldBeNil)
+				err = os.Remove(stPath)
+				So(err, ShouldBeNil)
+				c.jwt = ""
+
+				err = c.Login()
+				So(err, ShouldNotBeNil)
+
+				err = c.Login("user", "pass")
+				So(err, ShouldBeNil)
+
+				r, errc := c.AuthenticatedRequest()
+				So(errc, ShouldBeNil)
+				So(r, ShouldNotBeNil)
+
+				err = os.Chmod(jwtPath, 0777)
+				So(err, ShouldBeNil)
+				c.jwt = ""
+
+				_, err = c.AuthenticatedRequest()
+				So(err, ShouldNotBeNil)
+				So(err, ShouldResemble, JWTPermissionsError{jwtPath})
+
+				err = os.Remove(jwtPath)
+				So(err, ShouldBeNil)
+				c.jwt = ""
+
+				mph.enabled = true
+				mph.password = "wrong"
+				err = c.Login()
+				So(err, ShouldNotBeNil)
+				So(mph.out, ShouldEqual, "Password: \n")
+				So(mph.readCalled, ShouldBeTrue)
+
+				mph.password = "pass"
+				err = c.Login()
+				So(err, ShouldBeNil)
 			})
 
 			Convey("authPayLoad correctly maps a User to claims, or returns none", func() {
@@ -421,6 +551,32 @@ func TestServerOktaLogin(t *testing.T) {
 			jwt, errp := LoginWithOKTA(r, "user", code)
 			So(errp, ShouldBeNil)
 			So(jwt, ShouldNotBeBlank)
+
+			jwtb := ".gas.test.jwt"
+			stb := ".gas.test.servertoken"
+
+			c, errc := NewClientCLI(jwtb, stb, addr, certPath, true)
+			So(errc, ShouldBeNil)
+			mph := &mockPasswordHandler{
+				enabled:  true,
+				password: code,
+			}
+			c.passwordHandler = mph
+
+			jwtPath, errc := c.jwtStoragePath()
+			So(errc, ShouldBeNil)
+			stPath, errc := c.tokenStoragePath()
+			So(errc, ShouldBeNil)
+
+			defer func() {
+				os.Remove(jwtPath)
+				os.Remove(stPath)
+			}()
+
+			jwtc, errc := c.GetJWT()
+			So(errc, ShouldBeNil)
+			So(jwtc, ShouldEqual, jwt)
+			So(mph.out, ShouldContainSubstring, "Login at this URL")
 		})
 
 		Convey("After AddOIDCRoutes you can access the login endpoint", func() {

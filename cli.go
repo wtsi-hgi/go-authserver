@@ -47,6 +47,7 @@ type ClientCLI struct {
 	jwtBasename, serverTokenBasename, url, cert, user string
 	oktaMode                                          bool
 	jwt                                               string
+	passwordHandler                                   PasswordHandler
 }
 
 // NewClientCLI returns a ClientCLI that will get and store JWTs from and to a
@@ -73,6 +74,7 @@ func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode b
 		cert:                cert,
 		user:                user.Username,
 		oktaMode:            oktaMode,
+		passwordHandler:     StdPasswordHandler{},
 	}, nil
 }
 
@@ -96,9 +98,6 @@ func (c *ClientCLI) GetJWT() (string, error) {
 	}
 
 	err = c.Login()
-	if err == nil {
-		err = c.storeJWT(c.jwt)
-	}
 
 	return c.jwt, err
 }
@@ -119,6 +118,9 @@ func (c *ClientCLI) getStoredJWT() error {
 	token := strings.TrimSpace(string(content))
 
 	c.jwt, err = RefreshJWT(c.url, c.cert, token)
+	if err == nil {
+		err = c.storeJWT()
+	}
 
 	return err
 }
@@ -169,6 +171,10 @@ func (c *ClientCLI) Login(usernameAndPassword ...string) error {
 		c.jwt, err = Login(r, user, string(passwordB))
 	}
 
+	if err == nil {
+		err = c.storeJWT()
+	}
+
 	return err
 }
 
@@ -196,29 +202,50 @@ func (c *ClientCLI) getPasswordFromServerTokenFile() ([]byte, error) {
 	return GetStoredToken(tokenPath)
 }
 
+// PasswordHandler can ask for and return a password read from a reader.
+type PasswordHandler interface {
+	Prompt(string, ...interface{})
+	ReadPassword() ([]byte, error)
+	IsTerminal() bool
+}
+
+// StdPasswordHandler is the default password handler using stdout and stdin.
+type StdPasswordHandler struct{}
+
+// Prompt outputs the given string to stdout, formatting it with any given vars.
+func (p StdPasswordHandler) Prompt(msg string, a ...interface{}) {
+	fmt.Fprintf(os.Stdout, msg, a...)
+}
+
+// ReadPassword reads a password from stdin.
+func (p StdPasswordHandler) ReadPassword() ([]byte, error) {
+	return term.ReadPassword(syscall.Stdin)
+}
+
+// IsTerminal returns true if stdin is a terminal (and thus ReadPassword() is
+// possible).
+func (p StdPasswordHandler) IsTerminal() bool {
+	return term.IsTerminal(syscall.Stdin)
+}
+
 func (c *ClientCLI) askForPasswordOrCode() ([]byte, error) {
-	if !term.IsTerminal(syscall.Stdin) {
+	if !c.passwordHandler.IsTerminal() {
 		return nil, ErrNoAuth
 	}
 
 	if c.oktaMode {
-		cliPrint("Login at this URL, and then copy and paste the given code back here: https://%s%s\n",
+		c.passwordHandler.Prompt("Login at this URL, and then copy and paste the given code back here: https://%s%s\n",
 			c.url, EndpointOIDCCLILogin)
-		cliPrint("Auth Code:")
+		c.passwordHandler.Prompt("Auth Code:")
 	} else {
-		cliPrint("Password: ")
+		c.passwordHandler.Prompt("Password: ")
 	}
 
-	answer, err := term.ReadPassword(syscall.Stdin)
+	answer, err := c.passwordHandler.ReadPassword()
 
-	cliPrint("\n")
+	c.passwordHandler.Prompt("\n")
 
 	return answer, err
-}
-
-// cliPrint outputs the message to STDOUT.
-func cliPrint(msg string, a ...interface{}) {
-	fmt.Fprintf(os.Stdout, msg, a...)
 }
 
 // tokenStoragePath returns the path where we store our server token.
@@ -231,14 +258,14 @@ func (c *ClientCLI) tokenStoragePath() (string, error) {
 	return filepath.Join(dir, c.serverTokenBasename), nil
 }
 
-// storeJWT writes the given token string to a private file in user's home dir.
-func (c *ClientCLI) storeJWT(token string) error {
+// storeJWT writes our jwt string to a private file in user's home dir.
+func (c *ClientCLI) storeJWT() error {
 	path, err := c.jwtStoragePath()
 	if err != nil {
 		return err
 	}
 
-	return os.WriteFile(path, []byte(token), tokenFilePerms)
+	return os.WriteFile(path, []byte(c.jwt), tokenFilePerms)
 }
 
 // CanReadServerToken returns true if this user can read the server token file
