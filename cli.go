@@ -173,13 +173,13 @@ func (c *ClientCLI) Login(usernameAndPassword ...string) error {
 }
 
 func (c *ClientCLI) getUsernameAndPassword(usernameAndPassword ...string) (string, []byte, error) {
+	if len(usernameAndPassword) == usernameAndPasswordArgLength {
+		return usernameAndPassword[0], []byte(usernameAndPassword[1]), nil
+	}
+
 	passwordB, err := c.getPasswordFromServerTokenFile()
 	if err == nil && passwordB != nil {
 		return c.user, passwordB, nil
-	}
-
-	if len(usernameAndPassword) == usernameAndPasswordArgLength {
-		return usernameAndPassword[0], []byte(usernameAndPassword[1]), nil
 	}
 
 	passwordB, err = c.askForPasswordOrCode()
@@ -197,6 +197,10 @@ func (c *ClientCLI) getPasswordFromServerTokenFile() ([]byte, error) {
 }
 
 func (c *ClientCLI) askForPasswordOrCode() ([]byte, error) {
+	if !term.IsTerminal(syscall.Stdin) {
+		return nil, ErrNoAuth
+	}
+
 	if c.oktaMode {
 		cliPrint("Login at this URL, and then copy and paste the given code back here: https://%s%s\n",
 			c.url, EndpointOIDCCLILogin)
