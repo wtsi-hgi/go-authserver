@@ -29,6 +29,7 @@ import (
 	crand "crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
+	"fmt"
 	"os"
 )
 
@@ -44,11 +45,25 @@ const (
 	tokenFilePerms = 0600
 )
 
+// JWTPermissionsError is used to distinguish this type of error - where the
+// already stored JWT token doesn't have private permissions.
+type JWTPermissionsError struct {
+	tokenFile string
+}
+
+// Error is the print out string for JWTPermissionsError, so the user can
+// see and rectify the permissions issue.
+func (e JWTPermissionsError) Error() string {
+	return fmt.Sprintf("Token %s does not have %v permissions "+
+		"- won't use it", e.tokenFile, tokenFilePerms)
+}
+
 // GenerateAndStoreTokenForSelfClient calls GenerateToken() and returns the
 // token, but also stores it in the given file, readable only by the current
 // user. You could call this when starting a Server, and then in your
 // AuthCallback verify a client trying to login by comparing their "password"
-// against the token, using TokenMatches().
+// against the token, using TokenMatches(). (Using EnableAuthWithServerToken()
+// does all this for you.)
 //
 // A command line client started by the same user that started the Server would
 // then be able to login by getting the token using GetStoredToken(), and using
@@ -72,10 +87,25 @@ func GenerateAndStoreTokenForSelfClient(tokenFile string) ([]byte, error) {
 }
 
 // GetStoredToken reads the token from the given file but only returns it if
-// it's the correct length.
+// it's got some length.
+//
+// We also check if the file has private permissions, otherwise we won't use
+// it. This is as an attempt to reduce the likelihood of the token being leaked
+// with its long expiry time (used so the user doesn't have to continuously log
+// in, as we're not working with specific refresh tokens to get new access
+// tokens).
 func GetStoredToken(tokenFile string) ([]byte, error) {
+	stat, err := os.Stat(tokenFile)
+	if err != nil {
+		return nil, err
+	}
+
+	if stat.Mode() != tokenFilePerms {
+		return nil, JWTPermissionsError{tokenFile: tokenFile}
+	}
+
 	token, err := os.ReadFile(tokenFile)
-	if err != nil || len(token) != tokenLength {
+	if err != nil || len(token) < tokenLength {
 		return nil, err
 	}
 

@@ -28,6 +28,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"net/http"
 	"strings"
 
@@ -43,15 +44,14 @@ const ErrBadQuery = Error("bad query")
 
 const ClientProtocol = "https://"
 
-// Login is a client call to a Server listening at the given domain:port url
-// that checks the given password is valid for the given username, and returns a
-// JWT if so.
+// Login is a client call to a Server listening at the domain:port url given to
+// the request that checks the given password is valid for the given username,
+// and returns a JWT if so.
 //
-// Provide a non-blank path to a certificate to force us to trust that
-// certificate, eg. if the server was started with a self-signed certificate.
-func Login(url, cert, username, password string) (string, error) {
-	r := NewClientRequest(url, cert)
-
+// Make the request using NewClientRequest() and a non-blank path to a
+// certificate to force us to trust that certificate, eg. if the server was
+// started with a self-signed certificate.
+func Login(r *resty.Request, username, password string) (string, error) {
 	resp, err := r.SetFormData(map[string]string{
 		"username": username,
 		"password": password,
@@ -91,6 +91,14 @@ func newRestyClient(url, cert string) *resty.Client {
 	return client
 }
 
+// for testing purposes only, we disable host checking.
+func newTestingClientRequest(url, cert string) *resty.Request {
+	client := newRestyClient(url, cert)
+	client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: true}) //nolint:gosec
+
+	return client.R()
+}
+
 // jsonStringBodyToString takes the response body of a JSON string, and returns
 // it as a string.
 func jsonStringBodyToString(body []byte) string {
@@ -102,15 +110,22 @@ func jsonStringBodyToString(body []byte) string {
 }
 
 // LoginWithOKTA sends a request to the server containing the token as a cookie,
-// so it will be able to return the JWT for the user. Provide an addr that is
-// just the domain:port that was used to Start() the server.
-func LoginWithOKTA(addr, cert, token string) (string, error) {
-	r := NewClientRequest(addr, cert)
-
+// so it will be able to return the JWT for the user. The request should have
+// been made with an addr that is just the domain:port that was used to Start()
+// the server.
+//
+// Make the request using NewClientRequest() and a non-blank path to a
+// certificate to force us to trust that certificate, eg. if the server was
+// started with a self-signed certificate.
+func LoginWithOKTA(r *resty.Request, username, token string) (string, error) {
 	resp, err := r.SetCookie(&http.Cookie{
 		Name:  oktaCookieName,
 		Value: token,
-	}).Post(EndPointJWT)
+	}).SetFormData(map[string]string{
+		"username": username,
+		"password": token,
+	}).
+		Post(EndPointJWT)
 
 	if err != nil {
 		return "", err

@@ -30,6 +30,8 @@ package server
 import (
 	"errors"
 	"net/http"
+	"os/user"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -178,26 +180,55 @@ func hasError(errs ...error) bool {
 // *User based on the auth method used (oauth through cookie, or plain username
 // and password). That in turn gets passed to authPayload().
 func (s *Server) authenticator(c *gin.Context) (interface{}, error) {
+	username, password, errup := getUsernamePasswordFromContext(c)
+
+	if s.myselfLoggingIn(username, password) {
+		return &User{
+			Username: username,
+			UID:      s.serverUID,
+		}, nil
+	}
+
 	_, err := c.Request.Cookie(oktaCookieName)
 	if errors.Is(err, http.ErrNoCookie) {
-		return s.basicAuth(c)
+		if errup != nil {
+			return nil, errup
+		}
+
+		return s.basicAuth(username, password)
 	}
 
 	return s.oidcAuth(c)
 }
 
+func getUsernamePasswordFromContext(c *gin.Context) (string, string, error) {
+	var loginVals login
+	if err := c.ShouldBind(&loginVals); err != nil {
+		return "", "", jwt.ErrMissingLoginValues
+	}
+
+	return loginVals.Username, loginVals.Password, nil
+}
+
+// myselfLoggingIn checks if the supplied user is ourselves, and the password is
+// the unique token generated when we started the server having used
+// EnableAuthWithServerToken().
+func (s *Server) myselfLoggingIn(username, password string) bool {
+	if s.serverUser == "" {
+		return false
+	}
+
+	if username != s.serverUser {
+		return false
+	}
+
+	return TokenMatches([]byte(password), s.serverToken)
+}
+
 // basicAuth takes a web request and extracts the username and password from it
 // and then passes it to the server's auth callback so it can validate the login
 // and return a *User.
-func (s *Server) basicAuth(c *gin.Context) (*User, error) {
-	var loginVals login
-	if err := c.ShouldBind(&loginVals); err != nil {
-		return nil, jwt.ErrMissingLoginValues
-	}
-
-	username := loginVals.Username
-	password := loginVals.Password
-
+func (s *Server) basicAuth(username, password string) (*User, error) {
 	ok, uid := s.authCB(username, password)
 
 	if !ok {
@@ -218,6 +249,62 @@ func getUsernameFromEmail(email string) string {
 // tokenResponder returns token as a simple JSON string.
 func tokenResponder(c *gin.Context, code int, token string, t time.Time) {
 	c.JSON(http.StatusOK, token)
+}
+
+// EnableAuthWithServerToken is like EnableAuth(), but also stores the current
+// username as the "server" user who can login with a server token that will be
+// generated and stored in a file called tokenBasename in TokenDir(), instead of
+// via auth callback or okta.
+func (s *Server) EnableAuthWithServerToken(certFile, keyFile, tokenBasename string, acb AuthCallback) error {
+	u, err := user.Current()
+	if err != nil {
+		return err
+	}
+
+	s.serverUser = u.Username
+	s.serverUID = u.Uid
+
+	tokenPath, err := s.tokenStoragePath(tokenBasename)
+	if err != nil {
+		return err
+	}
+
+	s.serverTokenPath = tokenPath
+
+	s.serverToken, err = GenerateAndStoreTokenForSelfClient(tokenPath)
+	if err != nil {
+		return err
+	}
+
+	return s.EnableAuth(certFile, keyFile, acb)
+}
+
+// tokenStoragePath returns the path where we store our token for self-clients
+// to use.
+func (s *Server) tokenStoragePath(tokenBasename string) (string, error) {
+	tokenDir, err := TokenDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(tokenDir, tokenBasename), nil
+}
+
+// AllowedAccess gets our current user if we have EnableAuth(), and returns
+// true if that matches the given username. Always returns true if we have not
+// EnableAuth(), or if our current user is the user who started the Server.
+// If user is blank, it's a test if the current user started the Server.
+func (s *Server) AllowedAccess(c *gin.Context, user string) bool {
+	u := s.GetUser(c)
+	if u == nil {
+		return true
+	}
+
+	if u.Username == s.serverUser {
+		return true
+	}
+
+	return u.Username == user
 }
 
 // GetUser retrieves the *User information extracted from the JWT in the auth

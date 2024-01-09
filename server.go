@@ -34,6 +34,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -86,15 +87,19 @@ type StopCallback func()
 // Server is used to start a web server that provides a REST API for
 // authenticating, and a router you can add website pages to.
 type Server struct {
-	router    *gin.Engine
-	srv       *graceful.Server
-	srvMutex  sync.Mutex
-	authGroup *gin.RouterGroup
-	authCB    AuthCallback
-	stopCB    StopCallback
-	webOAuth  *oauthEnv
-	cliOAuth  *oauthEnv
-	Logger    *log.Logger
+	router          *gin.Engine
+	srv             *graceful.Server
+	srvMutex        sync.Mutex
+	authGroup       *gin.RouterGroup
+	serverUser      string // the username that started the server
+	serverUID       string
+	serverToken     []byte
+	serverTokenPath string
+	authCB          AuthCallback
+	stopCB          StopCallback
+	webOAuth        *oauthEnv
+	cliOAuth        *oauthEnv
+	Logger          *log.Logger
 }
 
 // New creates a Server which can serve a REST API and website.
@@ -208,6 +213,10 @@ func (s *Server) Stop() {
 		s.srvMutex.Unlock()
 
 		return
+	}
+
+	if s.serverTokenPath != "" {
+		os.Remove(s.serverTokenPath)
 	}
 
 	srv := s.srv
