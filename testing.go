@@ -28,6 +28,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
@@ -37,7 +38,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/wtsi-ssg/wr/network/port"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -87,14 +87,14 @@ func StartTestServer(s StartStop, certPath, keyPath string) (string, func() erro
 
 // getTestServerAddress determines a free port and returns localhost:port.
 func getTestServerAddress() (string, error) {
-	checker, err := port.NewChecker("localhost")
+	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		return "", err
 	}
 
-	port, _, err := checker.AvailableRange(minNumPortsForChecker)
+	defer l.Close()
 
-	return fmt.Sprintf("localhost:%d", port), err
+	return fmt.Sprintf("localhost:%d", l.Addr().(*net.TCPAddr).Port), nil
 }
 
 // startTestServerUsingAddress does the main work of StartTestServer().
