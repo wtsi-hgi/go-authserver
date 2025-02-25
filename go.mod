@@ -12,7 +12,6 @@ require (
 	github.com/okta/okta-jwt-verifier-golang v1.3.1
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/thanhpk/randstr v1.0.6
-	github.com/wtsi-ssg/wr v0.5.7
 	golang.org/x/oauth2 v0.14.0
 	golang.org/x/sync v0.5.0
 	golang.org/x/term v0.14.0

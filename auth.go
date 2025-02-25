@@ -95,7 +95,7 @@ func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
 // and authorisation with JWTs.
 func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMiddleware, error) {
 	return jwt.New(&jwt.GinJWTMiddleware{
-		Realm:            "wrstat",
+		Realm:            "gas",
 		SigningAlgorithm: "RS512",
 		PubKeyFile:       certFile,
 		PrivKeyFile:      keyFile,
@@ -110,7 +110,7 @@ func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMidd
 		},
 		LoginResponse:   tokenResponder,
 		RefreshResponse: tokenResponder,
-		TokenLookup:     "header: Authorization",
+		TokenLookup:     "cookie: jwt, header: Authorization",
 		TokenHeadName:   "Bearer",
 		TimeFunc:        time.Now,
 	})
