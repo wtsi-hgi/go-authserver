@@ -94,7 +94,7 @@ func getTestServerAddress() (string, error) {
 
 	defer l.Close()
 
-	return net.JoinHostPort("localhost", strconv.FormatInt(int64(l.Addr().(*net.TCPAddr).Port), 10)), nil
+	return net.JoinHostPort("localhost", strconv.Itoa(l.Addr().(*net.TCPAddr).Port)), nil //nolint:forcetypeassert
 }
 
 // startTestServerUsingAddress does the main work of StartTestServer().
