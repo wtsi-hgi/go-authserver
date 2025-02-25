@@ -210,6 +210,12 @@ func TestServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(resp.String(), ShouldBeBlank)
 
+				r = NewClientRequest(addr, certPath)
+				r.Cookies = []*http.Cookie{{Name: "jwt", Value: manualCorrectlySignedToken}}
+				resp, err = r.Get(EndPointAuth + "/test")
+				So(err, ShouldBeNil)
+				So(resp.String(), ShouldBeBlank)
+
 				var manualExpiredToken string
 				manualExpiredToken, err = makeTestToken(keyPath, start, start.Add(time.Nanosecond), true)
 				So(err, ShouldBeNil)
@@ -247,7 +253,7 @@ func TestServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(resp.String(), ShouldBeBlank)
 
-				So(called, ShouldEqual, 3)
+				So(called, ShouldEqual, 4)
 				So(claims[userKey], ShouldBeNil)
 				So(claims[claimKeyUsername], ShouldEqual, username)
 				user, ok := userI.(*User)
