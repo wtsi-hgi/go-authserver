@@ -27,13 +27,13 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -94,7 +94,7 @@ func getTestServerAddress() (string, error) {
 
 	defer l.Close()
 
-	return fmt.Sprintf("localhost:%d", l.Addr().(*net.TCPAddr).Port), nil
+	return net.JoinHostPort("localhost", strconv.FormatInt(int64(l.Addr().(*net.TCPAddr).Port), 10)), nil
 }
 
 // startTestServerUsingAddress does the main work of StartTestServer().
