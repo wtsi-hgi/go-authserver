@@ -29,20 +29,26 @@ package server
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/go-resty/resty/v2"
+	"github.com/mojocn/sseread"
 )
 
 type Error string
 
 func (e Error) Error() string { return string(e) }
 
-const ErrNoAuth = Error("authentication failed")
-const ErrBadQuery = Error("bad query")
+const (
+	ErrNoAuth    = Error("authentication failed")
+	ErrBadQuery  = Error("bad query")
+	ErrGetFailed = Error("GET status not 200")
 
-const ClientProtocol = "https://"
+	ClientProtocol = "https://"
+)
 
 // Login is a client call to a Server listening at the domain:port url given to
 // the request that checks the given password is valid for the given username,
@@ -107,6 +113,53 @@ func jsonStringBodyToString(body []byte) string {
 	str = strings.TrimSuffix(str, `"`)
 
 	return str
+}
+
+// SSERead can be used when testing server SSESender() routes. The returned
+// channel will receive the text of any broadcasts to the given url.
+func SSERead(url, cert string) (<-chan string, error) {
+	config, err := configWithCert(cert)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Transport: &http.Transport{TLSClientConfig: config}}
+
+	resp, err := client.Get(url) //nolint:noctx
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ErrGetFailed
+	}
+
+	ch, err := sseread.ReadCh(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	dataCh := make(chan string)
+
+	go func() {
+		for event := range ch {
+			dataCh <- string(event.Data)
+		}
+	}()
+
+	return dataCh, nil
+}
+
+func configWithCert(cert string) (*tls.Config, error) {
+	pemData, err := os.ReadFile(cert)
+	if err != nil {
+		return nil, err
+	}
+
+	rootCAs := x509.NewCertPool()
+	rootCAs.AppendCertsFromPEM(pemData)
+
+	return &tls.Config{RootCAs: rootCAs, MinVersion: tls.VersionTLS12}, nil
 }
 
 // LoginWithOKTA sends a request to the server containing the token as a cookie,

@@ -1,6 +1,8 @@
 module github.com/wtsi-hgi/go-authserver
 
-go 1.19
+go 1.23.0
+
+toolchain go1.24.1
 
 require (
 	github.com/appleboy/gin-jwt/v2 v2.9.1
@@ -9,12 +11,13 @@ require (
 	github.com/go-resty/resty/v2 v2.10.0
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/gorilla/sessions v1.2.2
+	github.com/mojocn/sseread v1.0.9
 	github.com/okta/okta-jwt-verifier-golang v1.3.1
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/thanhpk/randstr v1.0.6
 	golang.org/x/oauth2 v0.14.0
-	golang.org/x/sync v0.5.0
-	golang.org/x/term v0.14.0
+	golang.org/x/sync v0.12.0
+	golang.org/x/term v0.30.0
 	gopkg.in/tylerb/graceful.v1 v1.2.15
 )
 
@@ -52,10 +55,10 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.6.0 // indirect
-	golang.org/x/crypto v0.15.0 // indirect
-	golang.org/x/net v0.18.0 // indirect
-	golang.org/x/sys v0.14.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/net v0.37.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

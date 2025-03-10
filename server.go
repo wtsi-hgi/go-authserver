@@ -99,6 +99,7 @@ type Server struct {
 	stopCB          StopCallback
 	webOAuth        *oauthEnv
 	cliOAuth        *oauthEnv
+	sseChans        map[string]chan sseString
 	Logger          *log.Logger
 }
 
