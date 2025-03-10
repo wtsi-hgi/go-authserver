@@ -37,6 +37,7 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
+	gjwt "github.com/golang-jwt/jwt/v4"
 )
 
 type login struct {
@@ -118,15 +119,15 @@ func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMidd
 
 // authPayLoad is a function property for jwt.GinJWTMiddleware. It adds extra
 // claims to the JWT we send to the user.
-func authPayLoad(data interface{}) jwt.MapClaims {
+func authPayLoad(data interface{}) gjwt.MapClaims {
 	if v, ok := data.(*User); ok {
-		return jwt.MapClaims{
+		return gjwt.MapClaims{
 			claimKeyUsername: v.Username,
 			claimKeyUID:      v.UID,
 		}
 	}
 
-	return jwt.MapClaims{}
+	return gjwt.MapClaims{}
 }
 
 // authIdentityHandler is a function property for jwt.GinJWTMiddleware. It
@@ -151,7 +152,7 @@ func authIdentityHandler(c *gin.Context) interface{} {
 // retrieveClaimString finds and converts to a string the given claim in amongst
 // the given claims. If it doesn't exist or convert to a string, returns an
 // error.
-func retrieveClaimString(claims jwt.MapClaims, claim string) (string, error) {
+func retrieveClaimString(claims gjwt.MapClaims, claim string) (string, error) {
 	value, existed := claims[claim]
 	if !existed {
 		return "", ErrBadJWTClaim

@@ -156,7 +156,7 @@ func TestServer(t *testing.T) {
 				So(token, ShouldNotBeBlank)
 
 				var called int
-				var claims jwt.MapClaims
+				var claims gjwt.MapClaims
 				var userI interface{}
 				var gu *User
 
@@ -372,14 +372,14 @@ func TestServer(t *testing.T) {
 
 				claims = authPayLoad(exampleUser)
 				So(len(claims), ShouldEqual, 2)
-				So(claims, ShouldResemble, jwt.MapClaims{
+				So(claims, ShouldResemble, gjwt.MapClaims{
 					claimKeyUsername: username,
 					claimKeyUID:      uid,
 				})
 			})
 
 			Convey("retrieveClaimString fails with bad claims", func() {
-				claims := jwt.MapClaims{"foo": []string{"bar"}}
+				claims := gjwt.MapClaims{"foo": []string{"bar"}}
 
 				_, errc := retrieveClaimString(claims, "abc")
 				So(errc, ShouldNotBeNil)
