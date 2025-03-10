@@ -426,7 +426,7 @@ func TestServer(t *testing.T) {
 				So(string(resp.Body()), ShouldEqual, ErrNeedsAuth)
 			})
 
-			Convey("You can create, send to and receive from multipl SSE endpoints", func() {
+			Convey("You can create, send to and receive from multiple SSE endpoints", func() {
 				err = s.SSEBroadcast("invalid", "foo")
 				So(err, ShouldNotBeNil)
 

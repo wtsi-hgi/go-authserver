@@ -29,6 +29,7 @@ package server
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -41,14 +42,14 @@ const (
 	ErrBadSSEEvent = Error("SSESender has not been called with this event name")
 )
 
-// sseString is used to give a string the ability to Write() itself to a
+// sseString is used to give a string the ability to Write() itself to eg. a
 // http.ResponseWriter as a server sent event.
 type sseString struct {
 	data  string
 	event string
 }
 
-func (sse sseString) Write(w http.ResponseWriter) {
+func (sse sseString) Write(w io.Writer) {
 	fmt.Fprintf(
 		w,
 		"event:%s\ndata:%s\n\n",
