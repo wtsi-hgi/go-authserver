@@ -8,7 +8,7 @@ race: export CGO_ENABLED = 1
 race:
 	go test -tags netgo -race --count 1 ./...
 
-# curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.48
+# curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.6
 lint:
 	@golangci-lint run
 

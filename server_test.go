@@ -1,5 +1,5 @@
 /*******************************************************************************
- * Copyright (c) 2022 Genome Research Ltd.
+ * Copyright (c) 2022, 2025 Genome Research Ltd.
  *
  * Author: Sendu Bala <sb10@sanger.ac.uk>
  *
@@ -424,6 +424,89 @@ func TestServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(resp.StatusCode(), ShouldEqual, http.StatusUnauthorized)
 				So(string(resp.Body()), ShouldEqual, ErrNeedsAuth)
+			})
+
+			Convey("You can create, send to and receive from multiple SSE endpoints", func() {
+				err = s.SSEBroadcast("invalid", "foo")
+				So(err, ShouldNotBeNil)
+
+				sseEvent1 := "event1"
+				sseEvent2 := "event2"
+				sseRoute1 := "/sse/" + sseEvent1
+				sseRoute2 := "/sse/" + sseEvent2
+
+				s.router.GET(sseRoute1, s.SSESender(sseEvent1))
+				s.router.GET(sseRoute2, s.SSESender(sseEvent2))
+
+				err = s.SSEBroadcast("invalid", "foo")
+				So(err, ShouldNotBeNil)
+
+				numEvents := 4
+				errCh := make(chan error, numEvents)
+
+				go func() {
+					time.Sleep(1 * time.Second)
+
+					errb := s.SSEBroadcast(sseEvent1, "1 first")
+					errCh <- errb
+
+					errb = s.SSEBroadcast(sseEvent2, "2 first")
+					errCh <- errb
+
+					time.Sleep(100 * time.Millisecond)
+
+					errb = s.SSEBroadcast(sseEvent1, "1 second")
+					errCh <- errb
+
+					errb = s.SSEBroadcast(sseEvent2, "2 second")
+					errCh <- errb
+				}()
+
+				sseURL1 := "https://" + addr + sseRoute1
+				sseURL2 := "https://" + addr + sseRoute2
+
+				okCh := make(chan bool, numEvents)
+
+				testRead := func(url, expected1, expected2 string) {
+					ch, errr := SSERead(url, certPath)
+					errCh <- errr
+
+					if errr != nil {
+						return
+					}
+
+					data1 := <-ch
+					data2 := <-ch
+
+					okCh <- data1 == expected1 && data2 == expected2
+				}
+
+				go testRead(sseURL1, "1 first", "1 second")
+				go testRead(sseURL1, "1 first", "1 second")
+				go testRead(sseURL2, "2 first", "2 second")
+				go testRead(sseURL2, "2 first", "2 second")
+
+				errs := 0
+
+				for range numEvents * 2 {
+					erre := <-errCh
+					if erre != nil {
+						errs++
+					}
+				}
+
+				So(errs, ShouldEqual, 0)
+
+				oks := 0
+
+				for range numEvents {
+					ok := <-okCh
+					if ok {
+						oks++
+					}
+				}
+
+				So(oks, ShouldEqual, numEvents)
 			})
 
 			Convey("Stop() cleans up and calls the callback", func() {
