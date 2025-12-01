@@ -155,10 +155,12 @@ func TestServer(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(token, ShouldNotBeBlank)
 
-				var called int
-				var claims jwt.MapClaims
-				var userI interface{}
-				var gu *User
+				var (
+					called int
+					claims jwt.MapClaims
+					userI  interface{}
+					gu     *User
+				)
 
 				s.authGroup.GET("/test", func(c *gin.Context) {
 					called++
