@@ -65,3 +65,25 @@ jwt, err := gas.LoginWithOKTA("localhost:8080", "cert.pem", code)
 
 A web-based client can log in by visiting https://localhost:8080/login .
 After logging in they will be redirected to your default route.
+
+## Server token file
+
+The server can generate a short-lived server token file that allows the user
+who started the server to login as an administrative "self-client" without
+providing a normal password. This is enabled with `EnableAuthWithServerToken()`
+on the server side.
+
+By default `EnableAuthWithServerToken(certFile, keyFile, tokenBasename, acb)`
+will store the token in `TokenDir()/tokenBasename` (where `TokenDir()` is
+`$XDG_STATE_HOME` or the user's home directory). For flexibility, the
+`tokenBasename` argument may instead be an absolute path — if it is absolute
+the path will be used directly. The client constructor `NewClientCLI(...,
+serverTokenBasename, ...)` accepts the same form: pass an absolute path to
+point the client at a token file stored in a non-standard location.
+
+Security note: token files must be private (file mode `0600`) — the client and
+server will refuse to use token files with looser permissions and return an
+error (see `GetStoredToken()` and `JWTPermissionsError`). Always keep shared
+token files on secure storage and remove them when no longer needed.
+
+````

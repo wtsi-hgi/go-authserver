@@ -283,6 +283,23 @@ func TestServer(t *testing.T) {
 				So(errc, ShouldBeNil)
 				So(stPath, ShouldEqual, filepath.Join(tDir, stb))
 
+				Convey("absolute token path is accepted", func() {
+					tmpdir := t.TempDir()
+
+					absSt := filepath.Join(tmpdir, "shared.token")
+					c2, errc2 := NewClientCLI(jwtb, absSt, addr, certPath, false)
+					So(errc2, ShouldBeNil)
+					So(c2, ShouldNotBeNil)
+
+					st2, errc2 := c2.tokenStoragePath()
+					So(errc2, ShouldBeNil)
+					So(st2, ShouldEqual, absSt)
+
+					sp, errsp := s.tokenStoragePath(absSt)
+					So(errsp, ShouldBeNil)
+					So(sp, ShouldEqual, absSt)
+				})
+
 				_, err = os.Stat(jwtPath)
 				So(err, ShouldNotBeNil)
 				_, err = os.Stat(stPath)

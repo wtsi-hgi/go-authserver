@@ -61,6 +61,14 @@ type ClientCLI struct {
 // is the same one that started the server, the server used
 // EnableAuthWithServerToken(), and the given serverTokenBasename file in
 // XDG_STATE_HOME or HOME contains the server's token.
+//
+// Note: `serverTokenBasename` may be a simple basename (the default behaviour)
+// or an absolute path. If an absolute path is provided it will be used as the
+// token file path directly; otherwise the basename is joined with
+// `TokenDir()` (XDG_STATE_HOME or the user's HOME). This allows a client to
+// point to a server token file stored at a non-standard location (for example
+// when someone shares their server token file), while preserving existing
+// behaviour.
 func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode bool) (*ClientCLI, error) {
 	user, err := user.Current()
 	if err != nil {
@@ -250,6 +258,10 @@ func (c *ClientCLI) askForPasswordOrCode() ([]byte, error) {
 
 // tokenStoragePath returns the path where we store our server token.
 func (c *ClientCLI) tokenStoragePath() (string, error) {
+	if filepath.IsAbs(c.serverTokenBasename) {
+		return c.serverTokenBasename, nil
+	}
+
 	dir, err := TokenDir()
 	if err != nil {
 		return "", err
