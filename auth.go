@@ -256,6 +256,12 @@ func tokenResponder(c *gin.Context, code int, token string, t time.Time) {
 // username as the "server" user who can login with a server token that will be
 // generated and stored in a file called tokenBasename in TokenDir(), instead of
 // via auth callback or okta.
+//
+// Note: `tokenBasename` may be a basename (default behaviour) or an absolute
+// path. If an absolute path is provided it will be used directly as the token
+// file path; otherwise the basename is joined with `TokenDir()`. This allows
+// callers to store the token in a custom location if desired. File permissions
+// are still enforced (token files must be private -- see GetStoredToken()).
 func (s *Server) EnableAuthWithServerToken(certFile, keyFile, tokenBasename string, acb AuthCallback) error {
 	u, err := user.Current()
 	if err != nil {
@@ -283,6 +289,10 @@ func (s *Server) EnableAuthWithServerToken(certFile, keyFile, tokenBasename stri
 // tokenStoragePath returns the path where we store our token for self-clients
 // to use.
 func (s *Server) tokenStoragePath(tokenBasename string) (string, error) {
+	if filepath.IsAbs(tokenBasename) {
+		return tokenBasename, nil
+	}
+
 	tokenDir, err := TokenDir()
 	if err != nil {
 		return "", err
