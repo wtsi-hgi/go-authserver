@@ -284,8 +284,8 @@ func TestServer(t *testing.T) {
 				So(stPath, ShouldEqual, filepath.Join(tDir, stb))
 
 				Convey("absolute token path is accepted", func() {
-					tmpdir, err := os.MkdirTemp("", "gas-test-")
-					So(err, ShouldBeNil)
+					tmpdir, errm := os.MkdirTemp("", "gas-test-")
+					So(errm, ShouldBeNil)
 					defer os.RemoveAll(tmpdir)
 
 					absSt := filepath.Join(tmpdir, "shared.token")
