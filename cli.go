@@ -68,18 +68,11 @@ type ClientCLI struct {
 // (XDG_STATE_HOME or the user's HOME). This allows a client to point to a
 // server token file stored at a non-standard location (for example when someone
 // shares their server token file), while preserving existing behaviour.
-func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode bool, username ...string) (*ClientCLI, error) {
-	name := ""
-
-	if len(username) == 1 && username[0] != "" {
-		name = username[0]
-	} else {
-		user, err := user.Current()
-		if err != nil {
-			return nil, err
-		}
-
-		name = user.Username
+func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string,
+	oktaMode bool, username ...string) (*ClientCLI, error) {
+	name, err := getUsername(username...)
+	if err != nil {
+		return nil, err
 	}
 
 	return &ClientCLI{
@@ -91,6 +84,19 @@ func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode b
 		oktaMode:            oktaMode,
 		passwordHandler:     StdPasswordHandler{},
 	}, nil
+}
+
+func getUsername(username ...string) (string, error) {
+	if len(username) == 1 && username[0] != "" {
+		return username[0], nil
+	}
+
+	user, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+
+	return user.Username, nil
 }
 
 // GetJWT checks if we have stored a jwt in our file. If so, the JWT is

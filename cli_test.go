@@ -4,7 +4,7 @@ import (
 	"os/user"
 	"testing"
 
-	. "github.com/smartystreets/goconvey/convey"
+	. "github.com/smartystreets/goconvey/convey" //nolint:revive
 )
 
 func TestNewClientCLI(t *testing.T) {
