@@ -57,22 +57,29 @@ type ClientCLI struct {
 // If the user needs to login (no valid JWT found), asks user for the password
 // or an oktaCode if oktaMode is true.
 //
-// The normal password checking procedure will be bypassed if the current user
-// is the same one that started the server, the server used
-// EnableAuthWithServerToken(), and the given serverTokenBasename file in
+// The normal password checking procedure will be bypassed if the current (or
+// optionally supplied) user is the same one that started the server, the server
+// used EnableAuthWithServerToken(), and the given serverTokenBasename file in
 // XDG_STATE_HOME or HOME contains the server's token.
 //
 // Note: `serverTokenBasename` may be a simple basename (the default behaviour)
 // or an absolute path. If an absolute path is provided it will be used as the
-// token file path directly; otherwise the basename is joined with
-// `TokenDir()` (XDG_STATE_HOME or the user's HOME). This allows a client to
-// point to a server token file stored at a non-standard location (for example
-// when someone shares their server token file), while preserving existing
-// behaviour.
-func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode bool) (*ClientCLI, error) {
-	user, err := user.Current()
-	if err != nil {
-		return nil, err
+// token file path directly; otherwise the basename is joined with `TokenDir()`
+// (XDG_STATE_HOME or the user's HOME). This allows a client to point to a
+// server token file stored at a non-standard location (for example when someone
+// shares their server token file), while preserving existing behaviour.
+func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode bool, username ...string) (*ClientCLI, error) {
+	name := ""
+
+	if len(username) == 1 && username[0] != "" {
+		name = username[0]
+	} else {
+		user, err := user.Current()
+		if err != nil {
+			return nil, err
+		}
+
+		name = user.Username
 	}
 
 	return &ClientCLI{
@@ -80,7 +87,7 @@ func NewClientCLI(jwtBasename, serverTokenBasename, url, cert string, oktaMode b
 		serverTokenBasename: serverTokenBasename,
 		url:                 url,
 		cert:                cert,
-		user:                user.Username,
+		user:                name,
 		oktaMode:            oktaMode,
 		passwordHandler:     StdPasswordHandler{},
 	}, nil
