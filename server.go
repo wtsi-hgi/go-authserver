@@ -40,6 +40,9 @@ import (
 
 	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/tylerb/graceful.v1"
 )
 
@@ -178,6 +181,12 @@ func IncludeAbortErrorsInBody(c *gin.Context) {
 // It blocks, but will gracefully shut down on SIGINT and SIGTERM. If you
 // Start() in a go-routine, you can call Stop() manually.
 func (s *Server) Start(addr, certFile, keyFile string) error {
+	srv := s.createGracefulServer(addr)
+
+	return srv.ListenAndServeTLS(certFile, keyFile)
+}
+
+func (s *Server) createGracefulServer(addr string) *graceful.Server {
 	s.router.Use(secure.New(secure.DefaultConfig()))
 
 	srv := &graceful.Server{
@@ -194,7 +203,39 @@ func (s *Server) Start(addr, certFile, keyFile string) error {
 	s.srv = srv
 	s.srvMutex.Unlock()
 
-	return srv.ListenAndServeTLS(certFile, keyFile)
+	return srv
+}
+
+func (s *Server) StartACME(addr, acmeURL, cacheDir string) error {
+	srv := s.createGracefulServer(addr)
+
+	m := &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(addr),
+		Cache:      autocert.DirCache(cacheDir),
+		Client:     &acme.Client{DirectoryURL: acmeURL},
+	}
+
+	srv.Server.TLSConfig = m.TLSConfig()
+
+	var g errgroup.Group
+
+	g.Go(func() error {
+		srv := &http.Server{
+			Addr: ":80",
+			Handler: m.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "https://"+addr+r.RequestURI, http.StatusMovedPermanently)
+			})),
+		}
+
+		return srv.ListenAndServe()
+	})
+
+	g.Go(func() error {
+		return srv.ListenAndServeTLS("", "")
+	})
+
+	return g.Wait()
 }
 
 func (s *Server) SetStopCallBack(cb StopCallback) {
