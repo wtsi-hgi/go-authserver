@@ -35,6 +35,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -207,15 +208,16 @@ func (s *Server) createGracefulServer(addr string) *graceful.Server {
 	return srv
 }
 
-func (s *Server) StartACME(addr, acmeURL, cacheDir string) error {
-	srv := s.createGracefulServer(addr)
+func (s *Server) StartACME(addr string, acmeURL, cacheDir string) error {
+	return s.startACME(addr, 80, acmeURL, cacheDir)
+}
 
-	host := addr
+func (s *Server) StartACMEWithCustomHTTPPort(addr string, httpPort uint16, acmeURL, cacheDir string) error {
+	return s.startACME(addr, httpPort, acmeURL, cacheDir)
+}
 
-	if pos := strings.IndexByte(addr, ':'); pos >= 0 {
-		host = addr[:pos]
-	}
-
+func (s *Server) startACME(addr string, httpPort uint16, acmeURL, cacheDir string) error {
+	host, _, _ := strings.Cut(addr, ":")
 	m := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
 		HostPolicy: autocert.HostWhitelist(host),
@@ -223,13 +225,11 @@ func (s *Server) StartACME(addr, acmeURL, cacheDir string) error {
 		Client:     &acme.Client{DirectoryURL: acmeURL},
 	}
 
-	srv.Server.TLSConfig = m.TLSConfig()
-
 	var g errgroup.Group
 
 	g.Go(func() error {
 		srv := &http.Server{
-			Addr: ":80",
+			Addr: host + ":" + strconv.FormatUint(uint64(httpPort), 10),
 			Handler: m.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, "https://"+addr+r.RequestURI, http.StatusMovedPermanently)
 			})),
@@ -239,6 +239,10 @@ func (s *Server) StartACME(addr, acmeURL, cacheDir string) error {
 	})
 
 	g.Go(func() error {
+		srv := s.createGracefulServer(addr)
+
+		srv.Server.TLSConfig = m.TLSConfig()
+
 		return srv.ListenAndServeTLS("", "")
 	})
 
