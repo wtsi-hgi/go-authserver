@@ -35,6 +35,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -209,9 +210,15 @@ func (s *Server) createGracefulServer(addr string) *graceful.Server {
 func (s *Server) StartACME(addr, acmeURL, cacheDir string) error {
 	srv := s.createGracefulServer(addr)
 
+	host := addr
+
+	if pos := strings.IndexByte(addr, ':'); pos >= 0 {
+		host = addr[:pos]
+	}
+
 	m := &autocert.Manager{
 		Prompt:     autocert.AcceptTOS,
-		HostPolicy: autocert.HostWhitelist(addr),
+		HostPolicy: autocert.HostWhitelist(host),
 		Cache:      autocert.DirCache(cacheDir),
 		Client:     &acme.Client{DirectoryURL: acmeURL},
 	}
