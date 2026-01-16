@@ -55,6 +55,7 @@ const (
 	userKey            = "user"
 	claimKeyUsername   = "Username"
 	claimKeyUID        = "UID"
+	keysize            = 2048
 	ErrBadJWTClaim     = Error("JWT had bad claims")
 	ErrEmailNotPresent = Error("field `email` not present")
 )
@@ -104,7 +105,7 @@ func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
 func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMiddleware, error) {
 	mw := s.defaultGinMiddleware()
 
-	if certFile == "" && keyFile != "" {
+	if certFile == "" && keyFile != "" { //nolint:nestif
 		var err error
 
 		mw.PrivKeyBytes, mw.PubKeyBytes, err = readRSAKeyPairFromFile(keyFile)
@@ -131,7 +132,7 @@ func readRSAKeyPairFromFile(keyfile string) ([]byte, []byte, error) {
 
 	block, _ := pem.Decode(private)
 	if block == nil {
-		return nil, nil, fs.ErrInvalid
+		return nil, nil, fs.ErrNotExist
 	}
 
 	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
@@ -139,7 +140,12 @@ func readRSAKeyPairFromFile(keyfile string) ([]byte, []byte, error) {
 		return nil, nil, err
 	}
 
-	public, err := publicKeyPEMFromPrivateKey(key.(*rsa.PrivateKey))
+	privateKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fs.ErrNotExist
+	}
+
+	public, err := publicKeyPEMFromPrivateKey(privateKey)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,7 +166,7 @@ func publicKeyPEMFromPrivateKey(key *rsa.PrivateKey) ([]byte, error) {
 }
 
 func generateRSAKeyPair(keyfile string) ([]byte, []byte, error) {
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	key, err := rsa.GenerateKey(rand.Reader, keysize)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -175,7 +181,7 @@ func generateRSAKeyPair(keyfile string) ([]byte, []byte, error) {
 		Bytes: data,
 	})
 
-	if err = os.WriteFile(keyfile, private, 0600); err != nil {
+	if err = os.WriteFile(keyfile, private, 0600); err != nil { //nolint:mnd
 		return nil, nil, err
 	}
 

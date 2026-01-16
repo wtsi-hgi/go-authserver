@@ -265,7 +265,7 @@ func TestServer(t *testing.T) {
 			})
 
 			Convey("With a key file and no cert, EnableAuth generates its own key", func() {
-				err = s.EnableAuth("", filepath.Join(t.TempDir(), "key"), func(u, p string) (bool, string) {
+				err = s.EnableAuth("", filepath.Join(t.TempDir(), "key"), func(_, p string) (bool, string) {
 					ok := p == "pass"
 
 					return ok, uid
