@@ -28,8 +28,14 @@
 package server
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"errors"
+	"io/fs"
 	"net/http"
+	"os"
 	"os/user"
 	"path/filepath"
 	"strings"
@@ -49,6 +55,7 @@ const (
 	userKey            = "user"
 	claimKeyUsername   = "Username"
 	claimKeyUID        = "UID"
+	keysize            = 2048
 	ErrBadJWTClaim     = Error("JWT had bad claims")
 	ErrEmailNotPresent = Error("field `email` not present")
 )
@@ -69,7 +76,9 @@ const (
 // authorization header as a bearer token. Those endpoints can be implemented by
 // extracting the *User information out of the JWT using getUser().
 //
-// JWTs are signed and verified using the given cert and key files.
+// JWTs are signed and verified using the given cert and key files. If no cert
+// is provided, the public key is read from the key file, which will be
+// generated if it does not exist.
 //
 // GET on the endpoint will refresh the JWT. JWTs expire after 5 days, but can
 // be refreshed up until day 10 from issue.
@@ -94,11 +103,100 @@ func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
 // createAuthMiddleware creates jin-compatible middleware that enables logins
 // and authorisation with JWTs.
 func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMiddleware, error) {
-	return jwt.New(&jwt.GinJWTMiddleware{
+	mw := s.defaultGinMiddleware()
+
+	if certFile == "" && keyFile != "" { //nolint:nestif
+		var err error
+
+		mw.PrivKeyBytes, mw.PubKeyBytes, err = readRSAKeyPairFromFile(keyFile)
+		if errors.Is(err, fs.ErrNotExist) {
+			mw.PrivKeyBytes, mw.PubKeyBytes, err = generateRSAKeyPair(keyFile)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		mw.PrivKeyFile = keyFile
+		mw.PubKeyFile = certFile
+	}
+
+	return jwt.New(mw)
+}
+
+func readRSAKeyPairFromFile(keyfile string) ([]byte, []byte, error) {
+	private, err := os.ReadFile(keyfile)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	block, _ := pem.Decode(private)
+	if block == nil {
+		return nil, nil, fs.ErrNotExist
+	}
+
+	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	privateKey, ok := key.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fs.ErrNotExist
+	}
+
+	public, err := publicKeyPEMFromPrivateKey(privateKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return private, public, nil
+}
+
+func publicKeyPEMFromPrivateKey(key *rsa.PrivateKey) ([]byte, error) {
+	public, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return pem.EncodeToMemory(&pem.Block{
+		Type:  "PUBLIC KEY",
+		Bytes: public,
+	}), nil
+}
+
+func generateRSAKeyPair(keyfile string) ([]byte, []byte, error) {
+	key, err := rsa.GenerateKey(rand.Reader, keysize)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	data, err := x509.MarshalPKCS8PrivateKey(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	private := pem.EncodeToMemory(&pem.Block{
+		Type:  "PRIVATE KEY",
+		Bytes: data,
+	})
+
+	if err = os.WriteFile(keyfile, private, 0600); err != nil { //nolint:mnd
+		return nil, nil, err
+	}
+
+	public, err := publicKeyPEMFromPrivateKey(key)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return private, public, nil
+}
+
+func (s *Server) defaultGinMiddleware() *jwt.GinJWTMiddleware {
+	return &jwt.GinJWTMiddleware{
 		Realm:            "gas",
 		SigningAlgorithm: "RS512",
-		PubKeyFile:       certFile,
-		PrivKeyFile:      keyFile,
 		Timeout:          tokenDuration,
 		MaxRefresh:       tokenDuration,
 		IdentityKey:      userKey,
@@ -113,7 +211,7 @@ func (s *Server) createAuthMiddleware(certFile, keyFile string) (*jwt.GinJWTMidd
 		TokenLookup:     "cookie: jwt, header: Authorization",
 		TokenHeadName:   "Bearer",
 		TimeFunc:        time.Now,
-	})
+	}
 }
 
 // authPayLoad is a function property for jwt.GinJWTMiddleware. It adds extra

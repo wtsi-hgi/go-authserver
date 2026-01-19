@@ -30,9 +30,12 @@
 package server
 
 import (
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -40,6 +43,9 @@ import (
 
 	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/acme"
+	"golang.org/x/crypto/acme/autocert"
+	"golang.org/x/sync/errgroup"
 	"gopkg.in/tylerb/graceful.v1"
 )
 
@@ -75,6 +81,9 @@ const (
 	stopTimeout       = 10 * time.Second
 	readHeaderTimeout = 20 * time.Second
 )
+
+// ErrInvalidPort is returned when a server address specifies a non-https port.
+var ErrInvalidPort = errors.New("invalid https port")
 
 // AuthCallback is a function that returns true if the given password is valid
 // for the given username. It also returns the user's UID.
@@ -178,6 +187,10 @@ func IncludeAbortErrorsInBody(c *gin.Context) {
 // It blocks, but will gracefully shut down on SIGINT and SIGTERM. If you
 // Start() in a go-routine, you can call Stop() manually.
 func (s *Server) Start(addr, certFile, keyFile string) error {
+	return s.createGracefulServer(addr, nil).ListenAndServeTLS(certFile, keyFile)
+}
+
+func (s *Server) createGracefulServer(addr string, tls *tls.Config) *graceful.Server {
 	s.router.Use(secure.New(secure.DefaultConfig()))
 
 	srv := &graceful.Server{
@@ -187,6 +200,7 @@ func (s *Server) Start(addr, certFile, keyFile string) error {
 			Addr:              addr,
 			Handler:           s.router,
 			ReadHeaderTimeout: readHeaderTimeout,
+			TLSConfig:         tls,
 		},
 	}
 
@@ -194,7 +208,75 @@ func (s *Server) Start(addr, certFile, keyFile string) error {
 	s.srv = srv
 	s.srvMutex.Unlock()
 
-	return srv.ListenAndServeTLS(certFile, keyFile)
+	return srv
+}
+
+// StartACME acts like Start, but also starts a small http server in order to
+// pass the http-01 ACME challenge.
+//
+// The acmeURL should be the URL to the ACME directory.
+//
+// The cacheDir should be the path to a local directory owned by the server user
+// that cannot be read by other users.
+func (s *Server) StartACME(addr string, acmeURL, cacheDir string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	}
+
+	m := createACMEManager(host, acmeURL, cacheDir)
+
+	var g errgroup.Group
+
+	g.Go(func() error {
+		srv := &http.Server{
+			Addr:              host + ":http",
+			ReadHeaderTimeout: readHeaderTimeout,
+			Handler: m.HTTPHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "https://"+addr+r.RequestURI, http.StatusMovedPermanently)
+			})),
+		}
+
+		return srv.ListenAndServe()
+	})
+	g.Go(func() error {
+		return s.createGracefulServer(
+			addr,
+			&tls.Config{ //nolint:gosec
+				GetCertificate: m.GetCertificate,
+				NextProtos:     []string{"h2", "http/1.1"},
+			},
+		).ListenAndServeTLS("", "")
+	})
+
+	return g.Wait()
+}
+
+func createACMEManager(host, acmeURL, cacheDir string) *autocert.Manager {
+	return &autocert.Manager{
+		Prompt:     autocert.AcceptTOS,
+		HostPolicy: autocert.HostWhitelist(host),
+		Cache:      autocert.DirCache(cacheDir),
+		Client:     &acme.Client{DirectoryURL: acmeURL},
+	}
+}
+
+// StartACMETLSOnly acts like StartACME, but doesn't start the http-01 challenge
+// server on port 80, instead relying on a tls-alpn-01 ACME challenge.
+//
+// The addr must contain either no port, or specify port 443 or https.
+func (s *Server) StartACMETLSOnly(addr string, acmeURL, cacheDir string) error {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return err
+	} else if port != "" && port != "443" && port != "https" {
+		return ErrInvalidPort
+	}
+
+	return s.createGracefulServer(
+		host+":https",
+		createACMEManager(host, acmeURL, cacheDir).TLSConfig(),
+	).ListenAndServeTLS("", "")
 }
 
 func (s *Server) SetStopCallBack(cb StopCallback) {

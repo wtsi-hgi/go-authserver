@@ -38,6 +38,21 @@ restyRequest := gas.NewAuthenticatedClientRequest("localhost:8080", "cert.pem", 
 response, err := restyRequest.Get(gas.EndPointAuth+"/mysecuredendpoint")
 ```
 
+## ACME
+
+Instead of the server.Start method used above, which requires cert files to be
+passed in, you can use either the StartACME or StartACMETLSOnly methods, which
+allow the specifying of an ACME server for automatic SSL handling.
+
+The StartACME method will start a seperate HTTP server on port 80 which will
+handle the negotiation and challenge handling via the http-01 challenge.
+
+The StartACMETLSOnly requires the server be started on port 443, using the
+tls-alpn-01 challenge.
+
+Both methods, in addition to the domain URL, requires the ACME directory URL and
+a secure cache directory in which it will store certs and keys.
+
 ## Okta
 
 For okta auth, you will need an Okta app configured like:

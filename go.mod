@@ -15,9 +15,10 @@ require (
 	github.com/okta/okta-jwt-verifier-golang v1.3.1
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/thanhpk/randstr v1.0.6
+	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.33.0
-	golang.org/x/sync v0.18.0
-	golang.org/x/term v0.37.0
+	golang.org/x/sync v0.19.0
+	golang.org/x/term v0.39.0
 	gopkg.in/tylerb/graceful.v1 v1.2.15
 )
 
@@ -59,9 +60,8 @@ require (
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	golang.org/x/arch v0.23.0 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
-	golang.org/x/net v0.47.0 // indirect
-	golang.org/x/sys v0.38.0 // indirect
-	golang.org/x/text v0.31.0 // indirect
+	golang.org/x/net v0.48.0 // indirect
+	golang.org/x/sys v0.40.0 // indirect
+	golang.org/x/text v0.33.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )

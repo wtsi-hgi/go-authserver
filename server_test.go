@@ -264,6 +264,28 @@ func TestServer(t *testing.T) {
 				So(gu, ShouldResemble, exampleUser)
 			})
 
+			Convey("With a key file and no cert, EnableAuth generates its own key", func() {
+				err = s.EnableAuth("", filepath.Join(t.TempDir(), "key"), func(_, p string) (bool, string) {
+					ok := p == "pass"
+
+					return ok, uid
+				})
+				So(err, ShouldBeNil)
+
+				r := NewClientRequest(addr, certPath)
+
+				var token string
+
+				token, err = Login(r, username, "foo")
+				So(err, ShouldNotBeNil)
+				So(err, ShouldEqual, ErrNoAuth)
+				So(token, ShouldBeBlank)
+
+				token, err = Login(r, username, "pass")
+				So(err, ShouldBeNil)
+				So(token, ShouldNotBeBlank)
+			})
+
 			Convey("ClientCLI stores tokens and allows for self-login", func() {
 				jwtb := ".gas.test.jwt"
 				stb := ".gas.test.servertoken"
