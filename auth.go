@@ -94,7 +94,14 @@ func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
 	s.router.GET(EndPointJWT, authMiddleware.RefreshHandler)
 
 	auth := s.router.Group(EndPointAuth)
-	auth.Use(authMiddleware.MiddlewareFunc())
+	mf := authMiddleware.MiddlewareFunc()
+
+	auth.Use(func(ctx *gin.Context) {
+		_, exists := ctx.Get(userKey)
+		if !exists {
+			mf(ctx)
+		}
+	})
 	s.authGroup = auth
 
 	return nil
