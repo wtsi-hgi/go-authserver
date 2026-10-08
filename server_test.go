@@ -32,6 +32,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -262,6 +263,30 @@ func TestServer(t *testing.T) {
 				So(ok, ShouldBeTrue)
 				So(user, ShouldResemble, exampleUser)
 				So(gu, ShouldResemble, exampleUser)
+
+				Convey("When a user is already set, we can bypass jwt", func() {
+					r = NewAuthenticatedClientRequest(s.srv.Addr, certPath, "")
+					resp, err = r.Get(EndPointAuth + "/test")
+					So(err, ShouldBeNil)
+					So(resp.String(), ShouldEqual, `{"code":401,"message":"auth header is empty"}`)
+
+					s.authGroup.Handlers = slices.Insert(s.authGroup.Handlers, 0, func(ctx *gin.Context) {
+						ctx.Set(userKey, &User{
+							Username: "a",
+						})
+					})
+
+					s.authGroup.GET("/test2", func(c *gin.Context) {
+						gu = s.GetUser(c)
+					})
+
+					r = NewAuthenticatedClientRequest(s.srv.Addr, certPath, "")
+					resp, err = r.Get(EndPointAuth + "/test2")
+					So(err, ShouldBeNil)
+					So(resp.String(), ShouldBeBlank)
+					So(gu, ShouldNotBeNil)
+					So(gu.Username, ShouldEqual, "a")
+				})
 			})
 
 			Convey("With a key file and no cert, EnableAuth generates its own key", func() {

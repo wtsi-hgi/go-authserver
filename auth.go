@@ -80,6 +80,19 @@ const (
 // is provided, the public key is read from the key file, which will be
 // generated if it does not exist.
 //
+// Authentication can be overridden to be enabled when the previous middleware
+// handler sets a value to the userKey. This can be done by inserting a middleware
+// into your server.{authGroup}.handlers.
+// eg: s.EnableAuth(...)
+//
+//	s.authGroup.Handlers = slices.Insert(s.authGroup.Handlers, 0, func(ctx *gin.Context) {
+//							ctx.Set(userKey, &User{
+//								Username: "{username}",
+//							})
+//						})
+//
+// This allows you to have alternate authentication methods in addition to JWT.
+//
 // GET on the endpoint will refresh the JWT. JWTs expire after 5 days, but can
 // be refreshed up until day 10 from issue.
 func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
@@ -94,7 +107,14 @@ func (s *Server) EnableAuth(certFile, keyFile string, acb AuthCallback) error {
 	s.router.GET(EndPointJWT, authMiddleware.RefreshHandler)
 
 	auth := s.router.Group(EndPointAuth)
-	auth.Use(authMiddleware.MiddlewareFunc())
+	mf := authMiddleware.MiddlewareFunc()
+
+	auth.Use(func(ctx *gin.Context) {
+		_, exists := ctx.Get(userKey)
+		if !exists {
+			mf(ctx)
+		}
+	})
 	s.authGroup = auth
 
 	return nil
