@@ -43,10 +43,10 @@ import (
 
 	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
+	"github.com/wtsi-hgi/graceful"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/tylerb/graceful.v1"
 )
 
 const (
