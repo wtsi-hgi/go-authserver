@@ -15,11 +15,11 @@ require (
 	github.com/okta/okta-jwt-verifier-golang v1.3.1
 	github.com/smartystreets/goconvey v1.7.2
 	github.com/thanhpk/randstr v1.0.6
+	github.com/wtsi-hgi/graceful v1.2.16
 	golang.org/x/crypto v0.47.0
 	golang.org/x/oauth2 v0.33.0
 	golang.org/x/sync v0.19.0
 	golang.org/x/term v0.39.0
-	gopkg.in/tylerb/graceful.v1 v1.2.15
 )
 
 require (
