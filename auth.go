@@ -81,9 +81,17 @@ const (
 // generated if it does not exist.
 //
 // Authentication can be overridden to be enabled when the previous middleware
-// handler set a value to the userKey. This can be done by inserting a middleware
-// into your server.{authGroup}.handlers. This allows you to have alternate authentication
-// methods in addition to JWT.
+// handler sets a value to the userKey. This can be done by inserting a middleware
+// into your server.{authGroup}.handlers.
+// eg: s.EnableAuth(...)
+//
+//	s.authGroup.Handlers = slices.Insert(s.authGroup.Handlers, 0, func(ctx *gin.Context) {
+//							ctx.Set(userKey, &User{
+//								Username: "{username}",
+//							})
+//						})
+//
+// This allows you to have alternate authentication methods in addition to JWT.
 //
 // GET on the endpoint will refresh the JWT. JWTs expire after 5 days, but can
 // be refreshed up until day 10 from issue.
