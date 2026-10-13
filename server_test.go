@@ -581,7 +581,7 @@ func TestServer(t *testing.T) {
 					case err := <-errCh:
 						So(err, ShouldBeNil)
 					case <-time.After(2 * time.Second):
-						So(nil, ShouldNotEqual, nil)
+						So("timed out waiting for SSE response to return", ShouldBeEmpty)
 					}
 				})
 			})
