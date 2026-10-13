@@ -151,6 +151,9 @@ func (s *Server) SSESender(event string) func(c *gin.Context) {
 		w.Header().Set("Connection", "keep-alive")
 		w.Header().Set("Content-Type", "text/event-stream")
 
+		w.WriteHeaderNow()
+		w.Flush()
+
 		for {
 			select {
 			case e := <-events:
