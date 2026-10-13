@@ -574,8 +574,9 @@ func TestServer(t *testing.T) {
 
 				So(oks, ShouldEqual, numEvents)
 
-				Convey("And when no data is immediately written, the reponse returns immediately", func() {
+				Convey("And when no data is immediately written, the response returns immediately", func() {
 					go testRead(sseURL1, "1 first", "1 second")
+
 					select {
 					case err := <-errCh:
 						So(err, ShouldBeNil)
