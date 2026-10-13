@@ -573,6 +573,16 @@ func TestServer(t *testing.T) {
 				}
 
 				So(oks, ShouldEqual, numEvents)
+
+				Convey("And when no data is immediately written, the reponse returns immediately", func() {
+					go testRead(sseURL1, "1 first", "1 second")
+					select {
+					case err := <-errCh:
+						So(err, ShouldBeNil)
+					case <-time.After(2 * time.Second):
+						So(nil, ShouldNotEqual, nil)
+					}
+				})
 			})
 
 			Convey("Stop() cleans up and calls the callback", func() {
